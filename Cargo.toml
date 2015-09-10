@@ -1,0 +1,15 @@
+[package]
+name = "hairball"
+version = "0.1.0"
+authors = ["Colin Sherratt <colin.sherratt@gmail.com>"]
+build = "build.rs"
+
+[dependencies.entity]
+git = "https://github.com/whiske-rs/entity.git"
+
+[dependencies]
+capnp = "*"
+uuid = "*"
+
+[build_dependencies]
+capnpc = "*"
