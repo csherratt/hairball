@@ -28,11 +28,8 @@ struct LocalEntry {
 }
 
 struct ExternalEntry {
-    fileUuid @0 :Data;
-    union {
-        path @1 :Text;
-        index @2 :UInt32;
-    }
+    file @0 :UInt32;
+    path @1 :Text;
 }
 
 struct Entity {
@@ -47,5 +44,5 @@ struct Hairball {
     uuid @1 :Data;
     entities @2 :List(Entity);
     columns @3 :List(Column);
+    external @4 :List(Data);
 }
-

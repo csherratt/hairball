@@ -1,6 +1,8 @@
 extern crate capnp;
 extern crate uuid;
 
+use std::collections::HashMap;
+
 pub mod hairball_capnp {
     include!(concat!(env!("OUT_DIR"), "/hairball_capnp.rs"));
 }
@@ -12,6 +14,8 @@ const PATCH: &'static str = env!("CARGO_PKG_VERSION_PATCH");
 pub struct HairballBuilder {
     uuid: uuid::Uuid,
     entity: Vec<Entity<String>>,
+    external: Vec<uuid::Uuid>,
+    external_lookup: HashMap<uuid::Uuid, u32>,
     builder: capnp::message::Builder<capnp::message::HeapAllocator>
 }
 
@@ -23,7 +27,9 @@ impl HairballBuilder {
         HairballBuilder {
             uuid: uuid::Uuid::new_v4(),
             entity: Vec::new(),
-            builder: builder
+            builder: builder,
+            external: Vec::new(),
+            external_lookup: HashMap::new()
         }
     }
 
@@ -45,15 +51,30 @@ impl HairballBuilder {
 
     /// Adds a external entity to the file's key space
     pub fn add_external_entity(&mut self, entry: ExternalEntity<String>) -> u32 {
+        let insert = self.external_lookup.get(&entry.file).is_none();
+        if insert {
+            self.external.push(entry.file.clone());
+            let id = self.external.len() as u32 - 1;
+            self.external_lookup.insert(entry.file.clone(), id);
+        }
+
         self.entity.push(Entity::External(entry));
         self.entity.len() as u32 - 1
     }
 
     fn write_entities(&mut self) {
-        let root = self.builder.get_root::<hairball_capnp::hairball::Builder>().unwrap();
-        let mut entities = root.init_entities(self.entity.len() as u32);
-        for (i, e) in self.entity.iter().enumerate() {
-            e.write(entities.borrow().get(i as u32));
+        let mut root = self.builder.get_root::<hairball_capnp::hairball::Builder>().unwrap();
+        {
+            let mut entities = root.borrow().init_entities(self.entity.len() as u32);
+            for (i, e) in self.entity.iter().enumerate() {
+                e.write(entities.borrow().get(i as u32), &self.external_lookup);
+            }
+        }
+        {
+            let mut files = root.borrow().init_external(self.external.len() as u32);
+            for (i, file) in self.external.iter().enumerate() {
+                files.set(i as u32, file.as_bytes());
+            }
         }
     }
 
@@ -158,23 +179,30 @@ impl<'a> Entity<&'a str> {
             Entity::External(_) => None
         }
     }
+
+    pub fn file(&self) -> Option<&uuid::Uuid> {
+        match *self {
+            Entity::Local(_) => None,
+            Entity::External(ref e) => Some(&e.file)
+        }
+    }
 }
 
 impl Entity<String> {
-    fn write(&self, builder: hairball_capnp::entity::Builder)  {
+    fn write(&self, builder: hairball_capnp::entity::Builder, lookup: &HashMap<uuid::Uuid, u32>) {
         match *self {
             Entity::Local(ref e) => {
                 e.write(builder.init_local())
             }
             Entity::External(ref e) => {
-                e.write(builder.init_external())
+                e.write(builder.init_external(), lookup)
             }
         }
     }
 }
 
 impl<'a> Entity<&'a str> {
-    fn read(e: hairball_capnp::entity::Reader<'a>) -> Result<Entity<&'a str>, capnp::Error> {
+    fn read(e: hairball_capnp::entity::Reader<'a>, root: &HairballReader) -> Result<Entity<&'a str>, capnp::Error> {
         use hairball_capnp::entity::Which;
 
         Ok(match try!(e.which()) {
@@ -182,7 +210,7 @@ impl<'a> Entity<&'a str> {
                 Entity::Local(try!(LocalEntity::read(try!(l))))
             }
             Which::External(e) => {
-                Entity::External(try!(ExternalEntity::read(try!(e))))
+                Entity::External(try!(ExternalEntity::read(try!(e), root)))
             }
         })
     }
@@ -194,13 +222,32 @@ pub struct ExternalEntity<T> {
     name: T
 }
 
-impl<T> ExternalEntity<T> {
-    fn write(&self, _: hairball_capnp::external_entry::Builder) {
-
+impl ExternalEntity<String> {
+    pub fn new(file: uuid::Uuid, name: String) -> ExternalEntity<String> {
+        ExternalEntity {
+            file: file,
+            name: name
+        }
     }
 
-    fn read(_: hairball_capnp::external_entry::Reader) -> Result<ExternalEntity<T>, capnp::Error> {
-        panic!()
+    fn write(&self, mut builder: hairball_capnp::external_entry::Builder,
+             lookup: &HashMap<uuid::Uuid, u32>)
+    {
+        let file = lookup.get(&self.file).expect("Expected uuid to be in table");
+        builder.set_file(*file);
+        builder.set_path(&self.name[..]);
+    }
+}
+
+impl<'a> ExternalEntity<&'a str> {
+    fn read(reader: hairball_capnp::external_entry::Reader<'a>,
+            root: &HairballReader) -> Result<ExternalEntity<&'a str>, capnp::Error> {
+        let idx = reader.get_file();
+        let uuid = root.external(idx as usize).unwrap();
+        Ok(ExternalEntity {
+            file: uuid,
+            name: try!(reader.get_path())
+        })
     }
 }
 
@@ -209,6 +256,7 @@ pub struct HairballReader {
 }
 
 impl HairballReader {
+    /// Read a `Hairball` from a reader
     pub fn read<R>(r: &mut R) -> Result<HairballReader, capnp::Error>
         where R: std::io::Read
     {
@@ -217,6 +265,7 @@ impl HairballReader {
             .map(|r| HairballReader{reader: r})
     }
 
+    /// Get the number of enitites
     pub fn entities_len(&self) -> usize {
         self.reader.get_root::<hairball_capnp::hairball::Reader>()
             .and_then(|root| root.get_entities()).ok()
@@ -224,16 +273,38 @@ impl HairballReader {
             .unwrap_or(0)
     }
 
+    /// Get the entity
     pub fn entity(&self, idx: usize) -> Option<Entity<&str>> {
         self.reader.get_root::<hairball_capnp::hairball::Reader>()
             .and_then(|root| root.get_entities()).ok()
             .and_then(|entities| {
-                if (entities.len() as usize) < idx {
+                if (entities.len() as usize) <= idx {
                     None
                 } else {
-                    Entity::read(entities.get(idx as u32)).ok()
+                    Entity::read(entities.get(idx as u32), self).ok()
                 }
             })
     }
-}
 
+    /// Get the number of external references
+    pub fn external_len(&self) -> usize {
+        self.reader.get_root::<hairball_capnp::hairball::Reader>()
+            .and_then(|root| root.get_external()).ok()
+            .map(|x| x.len() as usize)
+            .unwrap_or(0)
+    }
+
+    /// Get an external uuid
+    pub fn external(&self, idx: usize) -> Option<uuid::Uuid> {
+        self.reader.get_root::<hairball_capnp::hairball::Reader>()
+            .and_then(|root| root.get_external()).ok()
+            .and_then(|external| {
+                if (external.len() as usize) <= idx {
+                    None
+                } else {
+                    external.get(idx as u32).ok()
+                }
+            })
+            .and_then(|x| uuid::Uuid::from_bytes(x))
+    }
+}
