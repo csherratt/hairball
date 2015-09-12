@@ -14,7 +14,7 @@ fn write_eid_0_to_10_write() {
     }
 
     let mut vec: Vec<u8> = Vec::new();
-    hairball.write(&mut vec);
+    hairball.write(&mut vec).unwrap();
 }
 
 #[test]
@@ -34,7 +34,7 @@ fn write_parent_list() {
     let mut hairball = HairballBuilder::new();
 
     let mut parent = None;
-    for i in 0..10 {
+    for _ in 0..10 {
         let e = if let Some(p) = parent {
             LocalEntity::anonymous().parent(p)
         } else {
@@ -44,7 +44,7 @@ fn write_parent_list() {
     }
 
     let mut vec: Vec<u8> = Vec::new();
-    hairball.write(&mut vec);
+    hairball.write(&mut vec).unwrap();
 }
 
 #[test]

@@ -1,8 +1,6 @@
 extern crate capnp;
 extern crate uuid;
 
-use std::collections::{HashMap, HashSet};
-
 pub mod hairball_capnp {
     include!(concat!(env!("OUT_DIR"), "/hairball_capnp.rs"));
 }
@@ -52,7 +50,7 @@ impl HairballBuilder {
     }
 
     fn write_entities(&mut self) {
-        let mut root = self.builder.get_root::<hairball_capnp::hairball::Builder>().unwrap();
+        let root = self.builder.get_root::<hairball_capnp::hairball::Builder>().unwrap();
         let mut entities = root.init_entities(self.entity.len() as u32);
         for (i, e) in self.entity.iter().enumerate() {
             e.write(entities.borrow().get(i as u32));
@@ -74,12 +72,12 @@ impl HairballBuilder {
     }
 
     /// Write the 
-    pub fn write<W>(mut self, w: &mut W)
+    pub fn write<W>(mut self, w: &mut W) -> Result<(), std::io::Error>
         where W: std::io::Write
     {
         self.write_header();
         self.write_entities();
-        capnp::serialize::write_message(w, &self.builder);
+        capnp::serialize::write_message(w, &self.builder)
     }
 }
 
@@ -163,7 +161,7 @@ impl<'a> Entity<&'a str> {
 }
 
 impl Entity<String> {
-    fn write(&self, mut builder: hairball_capnp::entity::Builder)  {
+    fn write(&self, builder: hairball_capnp::entity::Builder)  {
         match *self {
             Entity::Local(ref e) => {
                 e.write(builder.init_local())
@@ -197,11 +195,11 @@ pub struct ExternalEntity<T> {
 }
 
 impl<T> ExternalEntity<T> {
-    fn write(&self, mut builder: hairball_capnp::external_entry::Builder) {
+    fn write(&self, _: hairball_capnp::external_entry::Builder) {
 
     }
 
-    fn read(reader: hairball_capnp::external_entry::Reader) -> Result<ExternalEntity<T>, capnp::Error> {
+    fn read(_: hairball_capnp::external_entry::Reader) -> Result<ExternalEntity<T>, capnp::Error> {
         panic!()
     }
 }
