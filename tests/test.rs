@@ -1,6 +1,7 @@
 extern crate uuid;
 extern crate hairball;
 
+use std::io::Cursor;
 use hairball::{HairballReader, HairballBuilder, LocalEntity, ExternalEntity};
 
 
@@ -98,4 +99,16 @@ fn read_external() {
         assert_eq!(format!("{}", i), hairball.entity(i*2+1).unwrap().name().unwrap());
     }
     assert!(hairball.entity(10).is_none());
+}
+
+#[test]
+fn check_file_uuid() {
+    let builder = HairballBuilder::new();
+    let uuid = builder.uuid();
+    let mut vec: Vec<u8> = Vec::new();
+    builder.write(&mut vec).unwrap();
+
+    let reader = HairballReader::read(&mut Cursor::new(&vec[..])).unwrap();
+    assert_eq!(uuid, reader.uuid());
+
 }

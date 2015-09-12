@@ -265,6 +265,14 @@ impl HairballReader {
             .map(|r| HairballReader{reader: r})
     }
 
+    /// Ge the uuid for the file
+    pub fn uuid(&self) -> uuid::Uuid {
+        self.reader.get_root::<hairball_capnp::hairball::Reader>()
+            .and_then(|root| root.get_uuid()).ok()
+            .and_then(|x| uuid::Uuid::from_bytes(x))
+            .unwrap_or(uuid::Uuid::nil())
+    }
+
     /// Get the number of enitites
     pub fn entities_len(&self) -> usize {
         self.reader.get_root::<hairball_capnp::hairball::Reader>()
