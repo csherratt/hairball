@@ -153,6 +153,13 @@ impl<'a> Entity<&'a str> {
             Entity::External(ref e) => Some(&e.name)
         }
     }
+
+    pub fn parent(&self) -> Option<u32> {
+        match *self {
+            Entity::Local(ref e) => e.parent,
+            Entity::External(_) => None
+        }
+    }
 }
 
 impl Entity<String> {
