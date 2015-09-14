@@ -18,6 +18,7 @@ const PATCH: &'static str = env!("CARGO_PKG_VERSION_PATCH");
 
 /// A `Builder` is used to construct a hairball
 pub struct Builder {
+    uuid: uuid::Uuid,
     entity: Vec<Entity<String>>,
     external: Vec<uuid::Uuid>,
     external_lookup: HashMap<uuid::Uuid, u32>,
@@ -36,6 +37,7 @@ impl Builder {
         builder.init_root::<hairball_capnp::hairball::Builder>();
 
         Ok(Builder {
+            uuid: uuid::Uuid::new_v4(),
             entity: Vec::new(),
             builder: builder,
             external: Vec::new(),
@@ -90,13 +92,24 @@ impl Builder {
             version.set_minor(minor);
             version.set_patch(patch);
         }
+        root.set_uuid(self.uuid.as_bytes());
     }
 
-    /// Write the 
+    /// Write the `metadata` to finalize the hairball
     pub fn write(mut self) -> Result<(), std::io::Error> {
         self.write_header();
         self.write_entities();
         Ok(())
+    }
+
+    /// Get the current file uuid
+    pub fn uuid(&self) -> uuid::Uuid {
+        self.uuid
+    }
+
+    /// Set the uuid file
+    pub fn set_uuid(&mut self, uuid: uuid::Uuid) {
+        self.uuid = uuid;
     }
 }
 
@@ -307,5 +320,12 @@ impl Reader {
                 }
             })
             .and_then(|x| uuid::Uuid::from_bytes(x))
+    }
+
+    /// Get the current file uuid
+    pub fn uuid(&self) -> Option<uuid::Uuid> {
+        self.reader.get_root::<hairball_capnp::hairball::Reader>()
+            .and_then(|root| root.get_uuid()).ok()
+            .and_then(|uuid| uuid::Uuid::from_bytes(uuid))
     }
 }

@@ -119,3 +119,13 @@ fn read_external() {
     }
     assert!(hairball.entity(10).is_none());
 }
+
+#[test]
+fn read_uuid() {
+    let hairball = Builder::new("hairballs/uuid.hairball").unwrap();
+    let uuid = hairball.uuid();
+    hairball.write().unwrap();
+
+    let hairball = Reader::read("hairballs/uuid.hairball").unwrap();
+    assert_eq!(uuid, hairball.uuid().unwrap());
+}
