@@ -5,7 +5,7 @@
 //! The format for a Hairball Container is as follows. All words are in
 //! little endian order
 //!
-//! ['hairball'][flags; u32][num segments; u32][uuid [u8; 16]]
+//! ['hairball'][flags; u32][num segments; u32]
 //! [first_segment_header; section_header][segment 0; ..N]
 //!
 //! A segment header is pretty simple

@@ -16,15 +16,18 @@ const MAJOR: &'static str = env!("CARGO_PKG_VERSION_MAJOR");
 const MINOR: &'static str = env!("CARGO_PKG_VERSION_MINOR");
 const PATCH: &'static str = env!("CARGO_PKG_VERSION_PATCH");
 
-pub struct HairballBuilder {
+/// A `Builder` is used to construct a hairball
+pub struct Builder {
     entity: Vec<Entity<String>>,
     external: Vec<uuid::Uuid>,
     external_lookup: HashMap<uuid::Uuid, u32>,
     builder: capnp::message::Builder<container::Builder>
 }
 
-impl HairballBuilder {
-    pub fn new<P>(p: P) -> Result<HairballBuilder, container::Error>
+impl Builder {
+    /// Create a new hairball file with the supplied path. The file will be created
+    /// if the file exists it will be truncated.
+    pub fn new<P>(p: P) -> Result<Builder, Error>
         where P: AsRef<std::path::Path>
     {
         let mut builder = capnp::message::Builder::new(
@@ -32,7 +35,7 @@ impl HairballBuilder {
         );
         builder.init_root::<hairball_capnp::hairball::Builder>();
 
-        Ok(HairballBuilder {
+        Ok(Builder {
             entity: Vec::new(),
             builder: builder,
             external: Vec::new(),
@@ -197,7 +200,7 @@ impl Entity<String> {
 }
 
 impl<'a> Entity<&'a str> {
-    fn read(e: hairball_capnp::entity::Reader<'a>, root: &HairballReader) -> Result<Entity<&'a str>, capnp::Error> {
+    fn read(e: hairball_capnp::entity::Reader<'a>, root: &Reader) -> Result<Entity<&'a str>, capnp::Error> {
         use hairball_capnp::entity::Which;
 
         Ok(match try!(e.which()) {
@@ -236,7 +239,7 @@ impl ExternalEntity<String> {
 
 impl<'a> ExternalEntity<&'a str> {
     fn read(reader: hairball_capnp::external_entry::Reader<'a>,
-            root: &HairballReader) -> Result<ExternalEntity<&'a str>, capnp::Error> {
+            root: &Reader) -> Result<ExternalEntity<&'a str>, capnp::Error> {
         let idx = reader.get_file();
         let uuid = root.external(idx as usize).unwrap();
         Ok(ExternalEntity {
@@ -246,24 +249,24 @@ impl<'a> ExternalEntity<&'a str> {
     }
 }
 
-pub struct HairballReader {
+pub struct Reader {
     reader: capnp::message::Reader<container::Container>,
 }
 
-impl HairballReader {
+impl Reader {
     /// Read a `Hairball` from a reader
-    pub fn read<P>(p: P) -> Result<HairballReader, Error>
+    pub fn read<P>(p: P) -> Result<Reader, Error>
         where P: AsRef<std::path::Path>
     {
         let mut opts = capnp::message::ReaderOptions::new();
         opts.traversal_limit_in_words = !0;
         container::Container::read(p)
-            .map(|r| HairballReader{
+            .map(|r| Reader{
                 reader: capnp::message::Reader::new(r, opts)
             })
     }
 
-    /// Get the number of enitites
+    /// Get the number of entities
     pub fn entities_len(&self) -> usize {
         self.reader.get_root::<hairball_capnp::hairball::Reader>()
             .and_then(|root| root.get_entities()).ok()

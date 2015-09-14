@@ -9,16 +9,10 @@ struct Version {
     patch @2 :UInt16;
 }
 
-enum Encoding {
-    unpacked @0;
-    packed @1;
-}
-
 struct Column {
     name @0 :Text;
     version @1 :Version;
-    encoding @2 :Encoding;
-    data @3 :Data;
+    data @2 :Data;
 }
 
 # Used to lookup an entry

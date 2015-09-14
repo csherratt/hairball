@@ -1,13 +1,12 @@
 extern crate uuid;
 extern crate hairball;
 
-use std::io::Cursor;
-use hairball::{HairballReader, HairballBuilder, LocalEntity, ExternalEntity};
+use hairball::{Reader, Builder, LocalEntity, ExternalEntity};
 
 
 #[test]
 fn write_eid_0_to_10_write() {
-    let mut hairball = HairballBuilder::new("hairballs/0..10.hairball").unwrap();
+    let mut hairball = Builder::new("hairballs/0..10.hairball").unwrap();
 
     for i in 0..10 {
         hairball.add_entity(
@@ -20,7 +19,7 @@ fn write_eid_0_to_10_write() {
 
 #[test]
 fn write_eid_0_to_10_000_write() {
-    let mut hairball = HairballBuilder::new("hairballs/0..10_000.hairball").unwrap();
+    let mut hairball = Builder::new("hairballs/0..10_000.hairball").unwrap();
 
     for i in 0..10_000 {
         hairball.add_entity(
@@ -33,7 +32,7 @@ fn write_eid_0_to_10_000_write() {
 
 #[test]
 fn read_eid_0_to_10_read() {
-    let hairball = HairballReader::read("hairballs/ref/0..10.hairball").unwrap();
+    let hairball = Reader::read("hairballs/ref/0..10.hairball").unwrap();
     
     assert_eq!(hairball.entities_len(), 10);
     for i in 0..hairball.entities_len() {
@@ -44,22 +43,18 @@ fn read_eid_0_to_10_read() {
 
 #[test]
 fn read_eid_0_to_10_000_read() {
-    let hairball = HairballReader::read("hairballs/ref/0..10_000.hairball").unwrap();
+    let hairball = Reader::read("hairballs/ref/0..10_000.hairball").unwrap();
     
     assert_eq!(hairball.entities_len(), 10_000);
     for i in 0..hairball.entities_len() {
-        println!("{} {:?}", i, hairball.entity(0));
-        let e = hairball.entity(0);
-        //println!("{:?}", e);
-        //let e = e.unwrap();
-        //assert_eq!(format!("{}", i), e.name().unwrap())
+        let e = hairball.entity(i).unwrap();
+        assert_eq!(format!("{}", i), e.name().unwrap())
     }
 }
 
-/*
 #[test]
 fn write_parent_list() {
-    let mut hairball = HairballBuilder::new();
+    let mut hairball = Builder::new("hairballs/parent_list.hairball").unwrap();
 
     let mut parent = None;
     for _ in 0..10 {
@@ -71,14 +66,13 @@ fn write_parent_list() {
         parent = Some(hairball.add_entity(e));
     }
 
-    let mut vec: Vec<u8> = Vec::new();
-    hairball.write(&mut vec).unwrap();
+    hairball.write().unwrap();
 }
+
 
 #[test]
 fn read_parent_list() {
-    let mut file = std::fs::File::open("hairballs/ref/parent.hairball").unwrap();
-    let hairball = HairballReader::read(&mut file).unwrap();
+    let hairball = Reader::read("hairballs/ref/parent_list.hairball").unwrap();
 
     assert_eq!(hairball.entities_len(), 10);
     for i in 1..hairball.entities_len() {
@@ -89,7 +83,7 @@ fn read_parent_list() {
 
 #[test]
 fn write_external() {
-    let mut hairball = HairballBuilder::new();
+    let mut hairball = Builder::new("hairballs/external.hairball").unwrap();
 
     let a = uuid::Uuid::new_v4();
     let b = uuid::Uuid::new_v4();
@@ -103,14 +97,13 @@ fn write_external() {
         );
     }
 
-    let mut vec: Vec<u8> = Vec::new();
-    hairball.write(&mut vec).unwrap();
+    hairball.write().unwrap();
 }
+
 
 #[test]
 fn read_external() {
-    let mut file = std::fs::File::open("hairballs/ref/external.hairball").unwrap();
-    let hairball = HairballReader::read(&mut file).unwrap();
+    let hairball = Reader::read("hairballs/ref/external.hairball").unwrap();
 
     assert_eq!(hairball.external_len(), 2);
     let a = hairball.external(0).unwrap();
@@ -126,15 +119,3 @@ fn read_external() {
     }
     assert!(hairball.entity(10).is_none());
 }
-
-#[test]
-fn check_file_uuid() {
-    let builder = HairballBuilder::new();
-    let uuid = builder.uuid();
-    let mut vec: Vec<u8> = Vec::new();
-    builder.write(&mut vec).unwrap();
-
-    let reader = HairballReader::read(&mut Cursor::new(&vec[..])).unwrap();
-    assert_eq!(uuid, reader.uuid());
-}
-*/
