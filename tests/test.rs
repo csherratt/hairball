@@ -7,7 +7,7 @@ use hairball::{HairballReader, HairballBuilder, LocalEntity, ExternalEntity};
 
 #[test]
 fn write_eid_0_to_10_write() {
-    let mut hairball = HairballBuilder::new();
+    let mut hairball = HairballBuilder::new("hairballs/0..10.hairball").unwrap();
 
     for i in 0..10 {
         hairball.add_entity(
@@ -15,14 +15,25 @@ fn write_eid_0_to_10_write() {
         );
     }
 
-    let mut vec: Vec<u8> = Vec::new();
-    hairball.write(&mut vec).unwrap();
+    hairball.write().unwrap();
+}
+
+#[test]
+fn write_eid_0_to_10_000_write() {
+    let mut hairball = HairballBuilder::new("hairballs/0..10_000.hairball").unwrap();
+
+    for i in 0..10_000 {
+        hairball.add_entity(
+            LocalEntity::named(format!("{}", i))
+        );
+    }
+
+    hairball.write().unwrap();
 }
 
 #[test]
 fn read_eid_0_to_10_read() {
-    let mut file = std::fs::File::open("hairballs/ref/0-10.hairball").unwrap();
-    let hairball = HairballReader::read(&mut file).unwrap();
+    let hairball = HairballReader::read("hairballs/ref/0..10.hairball").unwrap();
     
     assert_eq!(hairball.entities_len(), 10);
     for i in 0..hairball.entities_len() {
@@ -31,6 +42,21 @@ fn read_eid_0_to_10_read() {
     }
 }
 
+#[test]
+fn read_eid_0_to_10_000_read() {
+    let hairball = HairballReader::read("hairballs/ref/0..10_000.hairball").unwrap();
+    
+    assert_eq!(hairball.entities_len(), 10_000);
+    for i in 0..hairball.entities_len() {
+        println!("{} {:?}", i, hairball.entity(0));
+        let e = hairball.entity(0);
+        //println!("{:?}", e);
+        //let e = e.unwrap();
+        //assert_eq!(format!("{}", i), e.name().unwrap())
+    }
+}
+
+/*
 #[test]
 fn write_parent_list() {
     let mut hairball = HairballBuilder::new();
@@ -110,5 +136,5 @@ fn check_file_uuid() {
 
     let reader = HairballReader::read(&mut Cursor::new(&vec[..])).unwrap();
     assert_eq!(uuid, reader.uuid());
-
 }
+*/

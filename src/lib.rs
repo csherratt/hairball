@@ -1,7 +1,12 @@
 extern crate capnp;
 extern crate uuid;
+extern crate memmap;
+extern crate byteorder;
 
 use std::collections::HashMap;
+pub use container::Error;
+
+mod container;
 
 pub mod hairball_capnp {
     include!(concat!(env!("OUT_DIR"), "/hairball_capnp.rs"));
@@ -12,35 +17,27 @@ const MINOR: &'static str = env!("CARGO_PKG_VERSION_MINOR");
 const PATCH: &'static str = env!("CARGO_PKG_VERSION_PATCH");
 
 pub struct HairballBuilder {
-    uuid: uuid::Uuid,
     entity: Vec<Entity<String>>,
     external: Vec<uuid::Uuid>,
     external_lookup: HashMap<uuid::Uuid, u32>,
-    builder: capnp::message::Builder<capnp::message::HeapAllocator>
+    builder: capnp::message::Builder<container::Builder>
 }
 
 impl HairballBuilder {
-    pub fn new() -> HairballBuilder {
-        let mut builder = capnp::message::Builder::new_default();
+    pub fn new<P>(p: P) -> Result<HairballBuilder, container::Error>
+        where P: AsRef<std::path::Path>
+    {
+        let mut builder = capnp::message::Builder::new(
+            try!(container::Builder::new(p))
+        );
         builder.init_root::<hairball_capnp::hairball::Builder>();
 
-        HairballBuilder {
-            uuid: uuid::Uuid::new_v4(),
+        Ok(HairballBuilder {
             entity: Vec::new(),
             builder: builder,
             external: Vec::new(),
             external_lookup: HashMap::new()
-        }
-    }
-
-    /// get the uuid of the file
-    pub fn uuid(&self) -> uuid::Uuid {
-        self.uuid
-    }
-
-    /// set the uuid of the Hairball 
-    pub fn set_uuid(&mut self, uuid: uuid::Uuid) {
-        self.uuid = uuid;
+        })
     }
 
     /// Adds a local entity to the file's keyspace
@@ -62,6 +59,7 @@ impl HairballBuilder {
         self.entity.len() as u32 - 1
     }
 
+    /// internal function that writes the contents of the entities into a file
     fn write_entities(&mut self) {
         let mut root = self.builder.get_root::<hairball_capnp::hairball::Builder>().unwrap();
         {
@@ -89,16 +87,13 @@ impl HairballBuilder {
             version.set_minor(minor);
             version.set_patch(patch);
         }
-        root.set_uuid(self.uuid.as_bytes());
     }
 
     /// Write the 
-    pub fn write<W>(mut self, w: &mut W) -> Result<(), std::io::Error>
-        where W: std::io::Write
-    {
+    pub fn write(mut self) -> Result<(), std::io::Error> {
         self.write_header();
         self.write_entities();
-        capnp::serialize::write_message(w, &self.builder)
+        Ok(())
     }
 }
 
@@ -252,25 +247,20 @@ impl<'a> ExternalEntity<&'a str> {
 }
 
 pub struct HairballReader {
-    reader: capnp::message::Reader<capnp::serialize::OwnedSegments>,
+    reader: capnp::message::Reader<container::Container>,
 }
 
 impl HairballReader {
     /// Read a `Hairball` from a reader
-    pub fn read<R>(r: &mut R) -> Result<HairballReader, capnp::Error>
-        where R: std::io::Read
+    pub fn read<P>(p: P) -> Result<HairballReader, Error>
+        where P: AsRef<std::path::Path>
     {
-        let opts = capnp::message::ReaderOptions::new();
-        capnp::serialize::read_message(r, opts)
-            .map(|r| HairballReader{reader: r})
-    }
-
-    /// Ge the uuid for the file
-    pub fn uuid(&self) -> uuid::Uuid {
-        self.reader.get_root::<hairball_capnp::hairball::Reader>()
-            .and_then(|root| root.get_uuid()).ok()
-            .and_then(|x| uuid::Uuid::from_bytes(x))
-            .unwrap_or(uuid::Uuid::nil())
+        let mut opts = capnp::message::ReaderOptions::new();
+        opts.traversal_limit_in_words = !0;
+        container::Container::read(p)
+            .map(|r| HairballReader{
+                reader: capnp::message::Reader::new(r, opts)
+            })
     }
 
     /// Get the number of enitites
@@ -284,12 +274,12 @@ impl HairballReader {
     /// Get the entity
     pub fn entity(&self, idx: usize) -> Option<Entity<&str>> {
         self.reader.get_root::<hairball_capnp::hairball::Reader>()
-            .and_then(|root| root.get_entities()).ok()
+            .and_then(|root| Ok(root.get_entities().unwrap())).ok()
             .and_then(|entities| {
                 if (entities.len() as usize) <= idx {
                     None
                 } else {
-                    Entity::read(entities.get(idx as u32), self).ok()
+                    Some(Entity::read(entities.get(idx as u32), self).unwrap())
                 }
             })
     }

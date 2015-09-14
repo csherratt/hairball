@@ -41,8 +41,7 @@ struct Entity {
 
 struct Hairball {
     version @0 :Version;
-    uuid @1 :Data;
-    entities @2 :List(Entity);
-    columns @3 :List(Column);
-    external @4 :List(Data);
+    entities @1 :List(Entity);
+    columns @2 :List(Column);
+    external @3 :List(Data);
 }

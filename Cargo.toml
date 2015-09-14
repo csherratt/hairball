@@ -4,12 +4,12 @@ version = "0.1.0"
 authors = ["Colin Sherratt <colin.sherratt@gmail.com>"]
 build = "build.rs"
 
-[dependencies.entity]
-git = "https://github.com/whiske-rs/entity.git"
-
 [dependencies]
 capnp = "*"
 uuid = "*"
+byteorder = "0.3"
+libc = "*"
+memmap = "*"
 
 [build_dependencies]
 capnpc = "*"
