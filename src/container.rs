@@ -15,19 +15,17 @@
 use std;
 use std::io::Read;
 use memmap::{Mmap, Protection};
-use uuid::Uuid;
 use capnp;
 
 use byteorder::{self, ReadBytesExt, WriteBytesExt, LittleEndian};
 
 const MAGIC: [u8; 8] = ['h' as u8, 'a' as u8, 'i' as u8, 'r' as u8,
                         'b' as u8, 'a' as u8, 'l' as u8, 'l' as u8];
-const CONTAINER_HEADER_SIZE: u64 = 8 + 4 + 4 + 16;
+const CONTAINER_HEADER_SIZE: u64 = 8 + 4 + 4;
 
 pub struct Container {
     file: std::fs::File,
     segments: Vec<Segment>,
-    uuid: Uuid
 }
 
 #[derive(Debug)]
@@ -56,7 +54,7 @@ impl Container {
     /// Internal function to read header of a file returns
     /// the size and flags if the header could be read ans
     /// is valid
-    fn read_header<R>(f: &mut R) -> Result<(u32, u32, Uuid), Error>
+    fn read_header<R>(f: &mut R) -> Result<(u32, u32), Error>
         where R: std::io::Read
     {
         // Read the magic value to validate the file
@@ -70,12 +68,7 @@ impl Container {
         let flags = try!(f.read_u32::<LittleEndian>());
         let segments = try!(f.read_u32::<LittleEndian>());
 
-        let mut uuid = [0; 16];
-        if try!(f.read(&mut uuid[..])) != 16 {
-            return Err(Error::InvalidHeader);
-        } 
-
-        Ok((flags, segments, Uuid::from_bytes(&uuid).unwrap()))
+        Ok((flags, segments))
     }
 
     /// Internal function to read header of a file returns
@@ -89,7 +82,6 @@ impl Container {
         // flags
         try!(self.file.write_u32::<LittleEndian>(0));
         try!(self.file.write_u32::<LittleEndian>(self.segments.len() as u32));
-        try!(self.file.write(self.uuid.as_bytes()));
 
         Ok(())
     }
@@ -100,7 +92,7 @@ impl Container {
     {
         let mut f = try!(std::fs::File::open(p));
 
-        let (_, nsegments, uuid) = try!(Container::read_header(&mut f));
+        let (_, nsegments) = try!(Container::read_header(&mut f));
 
         // Get the current offset
         let mut offset = CONTAINER_HEADER_SIZE;
@@ -114,7 +106,6 @@ impl Container {
         Ok(Container {
             file: f,
             segments: segments,
-            uuid: uuid
         })
     }
 
@@ -133,7 +124,6 @@ impl Container {
         let mut c = Container {
             file: try!(file),
             segments: Vec::new(),
-            uuid: Uuid::new_v4()
         };
 
         try!(c.write_header());
@@ -274,10 +264,6 @@ impl Builder {
         let c = try!(Container::create(p));
         Ok(Builder(c))
     }
-
-    /*pub fn set_uuid(&mut self, uuid: Uuid) {
-        self.0.uuid = uuid;
-    }*/
 }
 
 impl capnp::message::ReaderSegments for Builder {
