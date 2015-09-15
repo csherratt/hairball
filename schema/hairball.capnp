@@ -10,9 +10,10 @@ struct Version {
 }
 
 struct Column {
-    name @0 :Text;
-    version @1 :Version;
-    data @2 :Data;
+    next @0 :Column;
+    name @1 :Text;
+    version @2 :Version;
+    data @3 :AnyPointer;
 }
 
 # Used to lookup an entry
@@ -36,7 +37,7 @@ struct Entity {
 struct Hairball {
     version @0 :Version;
     entities @1 :List(Entity);
-    columns @2 :List(Column);
+    columns @2 :Column;
     external @3 :List(Data);
     uuid @4 :Data;
 }

@@ -25,6 +25,13 @@ pub struct Builder {
     builder: capnp::message::Builder<container::Builder>
 }
 
+impl Drop for Builder {
+    fn drop(&mut self) {
+        self.write_header();
+        self.write_entities();
+    }
+}
+
 impl Builder {
     /// Create a new hairball file with the supplied path. The file will be created
     /// if the file exists it will be truncated.
@@ -81,6 +88,7 @@ impl Builder {
         }
     }
 
+    /// Write the file metadata into the file
     fn write_header(&mut self) {
         let mut root = self.builder.get_root::<hairball_capnp::hairball::Builder>().unwrap();
         {
@@ -96,11 +104,7 @@ impl Builder {
     }
 
     /// Write the `metadata` to finalize the hairball
-    pub fn write(mut self) -> Result<(), std::io::Error> {
-        self.write_header();
-        self.write_entities();
-        Ok(())
-    }
+    pub fn close(self) {}
 
     /// Get the current file uuid
     pub fn uuid(&self) -> uuid::Uuid {
@@ -110,6 +114,40 @@ impl Builder {
     /// Set the uuid file
     pub fn set_uuid(&mut self, uuid: uuid::Uuid) {
         self.uuid = uuid;
+    }
+
+    /// access the column that matches this name, iff it does not
+    /// exist a column will be created with the provided name
+    pub fn column(&mut self, name: &str) -> Result<capnp::any_pointer::Builder, capnp::Error> {
+        let root = self.builder.get_root::<hairball_capnp::hairball::Builder>().unwrap();
+        let mut column = if root.has_columns() {
+            try!(root.get_columns())
+        } else {
+            root.init_columns()
+        };
+
+        loop {
+            // found a column that is named ans matches outs
+            if column.has_name() && &try!(column.borrow().get_name())[..] == name {
+                break;
+            // found uninitialized column
+            } else if !column.has_name() {
+                column.borrow().set_name(name);
+                break;
+            }
+
+            column = if column.has_next() {
+                try!(column.get_next())
+            } else {
+                column.init_next()
+            };
+        }
+
+        Ok(if column.has_data() {
+            column.get_data()
+        } else {
+            column.init_data()
+        })
     }
 }
 
@@ -273,6 +311,7 @@ impl Reader {
     {
         let mut opts = capnp::message::ReaderOptions::new();
         opts.traversal_limit_in_words = !0;
+        opts.nesting_limit = 2_000_000_000;
         container::Container::read(p)
             .map(|r| Reader{
                 reader: capnp::message::Reader::new(r, opts)
@@ -327,5 +366,38 @@ impl Reader {
         self.reader.get_root::<hairball_capnp::hairball::Reader>()
             .and_then(|root| root.get_uuid()).ok()
             .and_then(|uuid| uuid::Uuid::from_bytes(uuid))
+    }
+
+    /// fetch a column with the name, returns None if not column was found
+    /// that matches the name
+    pub fn column(&mut self, name: &str) -> Option<capnp::any_pointer::Reader> {
+        let root = self.reader.get_root::<hairball_capnp::hairball::Reader>().unwrap();
+        let mut column = match root.get_columns() {
+            Ok(c) => c,
+            Err(_) => return None
+        };
+
+        loop {
+            // found a column that is named ans matches outs
+            match column.borrow().get_name() {
+                Err(_) => return None,
+                Ok(v) => {
+                    if &v[..] == name {
+                        break
+                    }
+                }
+            }
+
+            column = match column.get_next() {
+                Ok(x) => x,
+                Err(_) => return None
+            };
+        }
+
+        if column.has_data() {
+            Some(column.get_data())
+        } else {
+            None
+        }
     }
 }

@@ -1,5 +1,6 @@
 extern crate uuid;
 extern crate hairball;
+extern crate capnp;
 
 use hairball::{Reader, Builder, LocalEntity, ExternalEntity};
 
@@ -14,7 +15,7 @@ fn write_eid_0_to_10_write() {
         );
     }
 
-    hairball.write().unwrap();
+    hairball.close();
 }
 
 #[test]
@@ -27,7 +28,7 @@ fn write_eid_0_to_10_000_write() {
         );
     }
 
-    hairball.write().unwrap();
+    hairball.close();
 }
 
 #[test]
@@ -66,9 +67,8 @@ fn write_parent_list() {
         parent = Some(hairball.add_entity(e));
     }
 
-    hairball.write().unwrap();
+    hairball.close();
 }
-
 
 #[test]
 fn read_parent_list() {
@@ -97,9 +97,8 @@ fn write_external() {
         );
     }
 
-    hairball.write().unwrap();
+    hairball.close();
 }
-
 
 #[test]
 fn read_external() {
@@ -124,8 +123,35 @@ fn read_external() {
 fn read_uuid() {
     let hairball = Builder::new("hairballs/uuid.hairball").unwrap();
     let uuid = hairball.uuid();
-    hairball.write().unwrap();
+    hairball.close();
 
     let hairball = Reader::read("hairballs/uuid.hairball").unwrap();
     assert_eq!(uuid, hairball.uuid().unwrap());
+}
+
+#[test]
+fn columns() {
+    let mut hairball = Builder::new("hairballs/column.hairball").unwrap();
+    for i in 0..1_000 {
+        let builder = hairball.column(&format!("column_{}", i)).unwrap();
+        let s = format!("column_{} \\o/", i);
+        let mut text = builder.initn_as::<capnp::text::Builder>(s.len() as u32);
+        text.push_str(&s);
+    }
+    for i in 0..1_000 {
+        let builder = hairball.column(&format!("column_{}", i)).unwrap().as_reader();
+        let s = format!("column_{} \\o/", i);
+        let text = builder.get_as::<capnp::text::Reader>().unwrap();
+        assert_eq!(s, text);
+    }
+    hairball.close();
+
+    let mut hairball = Reader::read("hairballs/column.hairball").unwrap();
+    for i in 0..1_000 {
+        println!("Looking for {}", i);
+        let builder = hairball.column(&format!("column_{}", i)).unwrap();
+        let s = format!("column_{} \\o/", i);
+        let text = builder.get_as::<capnp::text::Reader>().unwrap();
+        assert_eq!(&s, text);
+    }
 }
