@@ -395,4 +395,32 @@ impl Reader {
             None
         }
     }
+
+    //
+    pub fn into_mapping<E, F>(&self, mut f: F) -> ReaderMapping<E>
+        where F: FnMut(usize) -> E
+    {
+        let e: Vec<E> = (0..self.entities_len()).map(&mut f).collect();
+
+        ReaderMapping {
+            reader: self,
+            entities: e
+        }
+    }
+}
+
+pub struct ReaderMapping<'a, E> {
+    reader: &'a Reader,
+    entities: Vec<E>
+}
+
+impl<'a, E> ReaderMapping<'a, E> {
+    pub fn entity(&self, i: usize) -> Option<&E> {
+        self.entities.get(i)
+    }
+}
+
+impl<'a, E> std::ops::Deref for ReaderMapping<'a, E> {
+    type Target = Reader;
+    fn deref(&self) -> &Reader { self.reader }
 }

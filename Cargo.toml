@@ -6,10 +6,14 @@ authors = ["Colin Sherratt <colin.sherratt@gmail.com>"]
 [dependencies.hairball]
 path = "src/hairball"
 
+[dependencies.hairball_mesh]
+path = "src/mesh"
+
 [dev_dependencies]
 uuid = "0.1"
 capnp = "0.4"
 
 [features]
 default = []
-build-schema = ["hairball/build-schema"]
+build-schema = ["hairball/build-schema",
+                "hairball_mesh/build-schema"]

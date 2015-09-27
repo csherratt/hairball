@@ -1,0 +1,28 @@
+[package]
+name = "hairball_mesh"
+version = "0.1.0"
+authors = ["Colin Sherratt <colin.sherratt@gmail.com>"]
+build = "build.rs"
+
+[lib]
+name = "hairball_mesh"
+path = "lib.rs"
+
+[dependencies]
+capnp = "0.4"
+
+[dependencies.hairball]
+path = "../hairball"
+
+[dependencies.gfx_mesh]
+git = "https://github.com/csherratt/gfx_mesh.git"
+
+[build_dependencies]
+capnpc = "0.4"
+
+[features]
+default = ["build-schema"]
+build-schema = []
+
+
+
