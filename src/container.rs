@@ -149,10 +149,14 @@ impl Container {
             self.segments[0].offset as u32
         };
 
+        let version = ::semver::Version::parse(::VERSION).unwrap();
+
         try!(self.file.seek(SeekFrom::Start(0)));
         Header{
             offset: first,
-            version: [0, 1, 0],
+            version: [version.major as u32,
+                      version.minor as u32,
+                      version.patch as u32],
             flags: 0,
             num_segments: self.segments.len() as u32,
             segments_offset: offset,
@@ -238,8 +242,6 @@ struct Segment {
 impl Segment {
     /// Read a segment from a file at a give offset
     fn read(f: &mut std::fs::File, offset: u64, size: u32) -> Result<Segment, Error> {
-        use std::io::{Seek, SeekFrom};
-
         // Memory map the file in RO mode
         let map = try!(Mmap::open_with_offset(f, Protection::Read, offset as usize, size as usize));
 
@@ -259,9 +261,6 @@ impl Segment {
             // write an empty byte to create the segment on disk
             try!(f.write(&[0u8]));
         }
-
-        println!("{:?} {:?}", offset, size);
-
         
         // Memory map the file in RO mode
         let map = try!(Mmap::open_with_offset(f, Protection::ReadWrite, offset as usize, size as usize));

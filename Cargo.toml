@@ -1,15 +1,16 @@
 [package]
 name = "hairball"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Colin Sherratt <colin.sherratt@gmail.com>"]
 build = "build.rs"
 
 [dependencies]
-capnp = "*"
-uuid = "*"
+capnp = "0.4"
+uuid = "0.1"
 byteorder = "0.3"
-libc = "*"
-memmap = "*"
+libc = "0.1"
+memmap = "0.2"
+semver = "0.1"
 
 [build_dependencies]
-capnpc = "*"
+capnpc = "0.4"

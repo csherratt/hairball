@@ -2,6 +2,7 @@ extern crate capnp;
 extern crate uuid;
 extern crate memmap;
 extern crate byteorder;
+extern crate semver;
 
 use std::collections::HashMap;
 pub use container::Error;
@@ -12,9 +13,7 @@ pub mod hairball_capnp {
     include!(concat!(env!("OUT_DIR"), "/hairball_capnp.rs"));
 }
 
-const MAJOR: &'static str = env!("CARGO_PKG_VERSION_MAJOR");
-const MINOR: &'static str = env!("CARGO_PKG_VERSION_MINOR");
-const PATCH: &'static str = env!("CARGO_PKG_VERSION_PATCH");
+pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 /// A `Builder` is used to construct a hairball
 pub struct Builder {
