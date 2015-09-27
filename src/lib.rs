@@ -27,7 +27,6 @@ pub struct Builder {
 
 impl Drop for Builder {
     fn drop(&mut self) {
-        self.write_header();
         self.write_entities();
     }
 }
@@ -38,13 +37,20 @@ impl Builder {
     pub fn new<P>(p: P) -> Result<Builder, Error>
         where P: AsRef<std::path::Path>
     {
+        Builder::new_with_uuid(p, uuid::Uuid::new_v4())
+    }
+
+    /// Create a new hairball with a specific uuid
+    pub fn new_with_uuid<P>(p: P, uuid: uuid::Uuid) -> Result<Builder, Error>
+        where P: AsRef<std::path::Path>
+    {
         let mut builder = capnp::message::Builder::new(
-            try!(container::Builder::new(p))
+            try!(container::Builder::new(p, uuid))
         );
         builder.init_root::<hairball_capnp::hairball::Builder>();
 
         Ok(Builder {
-            uuid: uuid::Uuid::new_v4(),
+            uuid: uuid,
             entity: Vec::new(),
             builder: builder,
             external: Vec::new(),
@@ -86,21 +92,6 @@ impl Builder {
                 files.set(i as u32, file.as_bytes());
             }
         }
-    }
-
-    /// Write the file metadata into the file
-    fn write_header(&mut self) {
-        let mut root = self.builder.get_root::<hairball_capnp::hairball::Builder>().unwrap();
-        {
-            let mut version = root.borrow().init_version();
-            let major: u16 = MAJOR.parse::<u16>().unwrap();
-            let minor: u16 = MINOR.parse::<u16>().unwrap();
-            let patch: u16 = PATCH.parse::<u16>().unwrap();
-            version.set_major(major);
-            version.set_minor(minor);
-            version.set_patch(patch);
-        }
-        root.set_uuid(self.uuid.as_bytes());
     }
 
     /// Write the `metadata` to finalize the hairball
@@ -301,6 +292,7 @@ impl<'a> ExternalEntity<&'a str> {
 }
 
 pub struct Reader {
+    uuid: uuid::Uuid,
     reader: capnp::message::Reader<container::Container>,
 }
 
@@ -314,6 +306,7 @@ impl Reader {
         opts.nesting_limit = 2_000_000_000;
         container::Container::read(p)
             .map(|r| Reader{
+                uuid: r.uuid(),
                 reader: capnp::message::Reader::new(r, opts)
             })
     }
@@ -362,10 +355,8 @@ impl Reader {
     }
 
     /// Get the current file uuid
-    pub fn uuid(&self) -> Option<uuid::Uuid> {
-        self.reader.get_root::<hairball_capnp::hairball::Reader>()
-            .and_then(|root| root.get_uuid()).ok()
-            .and_then(|uuid| uuid::Uuid::from_bytes(uuid))
+    pub fn uuid(&self) -> uuid::Uuid {
+        self.uuid
     }
 
     /// fetch a column with the name, returns None if not column was found

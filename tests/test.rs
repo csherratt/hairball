@@ -6,35 +6,18 @@ use hairball::{Reader, Builder, LocalEntity, ExternalEntity};
 
 
 #[test]
-fn write_eid_0_to_10_write() {
+fn eid_0_to_10_write() {
+    // Write
     let mut hairball = Builder::new("hairballs/0..10.hairball").unwrap();
-
     for i in 0..10 {
         hairball.add_entity(
             LocalEntity::named(format!("{}", i))
         );
     }
-
     hairball.close();
-}
 
-#[test]
-fn write_eid_0_to_10_000_write() {
-    let mut hairball = Builder::new("hairballs/0..10_000.hairball").unwrap();
-
-    for i in 0..10_000 {
-        hairball.add_entity(
-            LocalEntity::named(format!("{}", i))
-        );
-    }
-
-    hairball.close();
-}
-
-#[test]
-fn read_eid_0_to_10_read() {
-    let hairball = Reader::read("hairballs/ref/0..10.hairball").unwrap();
-    
+    // Read
+    let hairball = Reader::read("hairballs/0..10.hairball").unwrap();
     assert_eq!(hairball.entities_len(), 10);
     for i in 0..hairball.entities_len() {
         let e = hairball.entity(i).unwrap();
@@ -42,11 +25,20 @@ fn read_eid_0_to_10_read() {
     }
 }
 
+/// This is big enough to trip the segment table and force it to be
+/// written at the end of the file rather then the start
 #[test]
-fn read_eid_0_to_10_000_read() {
-    let hairball = Reader::read("hairballs/ref/0..10_000.hairball").unwrap();
-    
-    assert_eq!(hairball.entities_len(), 10_000);
+fn eid_0_to_140_000_write() {
+    let mut hairball = Builder::new("hairballs/0..140_000.hairball").unwrap();
+    for i in 0..140_000 {
+        hairball.add_entity(
+            LocalEntity::named(format!("{}", i))
+        );
+    }
+    hairball.close();
+
+    let hairball = Reader::read("hairballs/0..140_000.hairball").unwrap();
+    assert_eq!(hairball.entities_len(), 140_000);
     for i in 0..hairball.entities_len() {
         let e = hairball.entity(i).unwrap();
         assert_eq!(format!("{}", i), e.name().unwrap())
@@ -54,7 +46,7 @@ fn read_eid_0_to_10_000_read() {
 }
 
 #[test]
-fn write_parent_list() {
+fn parent_list() {
     let mut hairball = Builder::new("hairballs/parent_list.hairball").unwrap();
 
     let mut parent = None;
@@ -68,12 +60,8 @@ fn write_parent_list() {
     }
 
     hairball.close();
-}
 
-#[test]
-fn read_parent_list() {
-    let hairball = Reader::read("hairballs/ref/parent_list.hairball").unwrap();
-
+    let hairball = Reader::read("hairballs/parent_list.hairball").unwrap();
     assert_eq!(hairball.entities_len(), 10);
     for i in 1..hairball.entities_len() {
         let e = hairball.entity(i).unwrap();
@@ -98,12 +86,8 @@ fn write_external() {
     }
 
     hairball.close();
-}
 
-#[test]
-fn read_external() {
-    let hairball = Reader::read("hairballs/ref/external.hairball").unwrap();
-
+    let hairball = Reader::read("hairballs/external.hairball").unwrap();
     assert_eq!(hairball.external_len(), 2);
     let a = hairball.external(0).unwrap();
     let b = hairball.external(1).unwrap();
@@ -126,7 +110,7 @@ fn read_uuid() {
     hairball.close();
 
     let hairball = Reader::read("hairballs/uuid.hairball").unwrap();
-    assert_eq!(uuid, hairball.uuid().unwrap());
+    assert_eq!(uuid, hairball.uuid());
 }
 
 #[test]

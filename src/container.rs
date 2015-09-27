@@ -5,8 +5,9 @@
 //! The format for a Hairball Container is as follows. All words are in
 //! little endian order
 //!
-//! ['hairball'][flags; u32][num segments; u32]
-//! [first_segment_header; section_header][segment 0; ..N]
+//! ['hairball'][version; [u32; 3]][flags; u32]
+//! [offset: u32][num segments; u32][segment_offset: u64]
+//! [uuid; [u8; 16]]
 //!
 //! A segment header is pretty simple
 //! [allocated in words; u32][reserved; u32]
@@ -16,16 +17,19 @@ use std;
 use std::io::Read;
 use memmap::{Mmap, Protection};
 use capnp;
+use uuid;
 
 use byteorder::{self, ReadBytesExt, WriteBytesExt, LittleEndian};
 
-const MAGIC: [u8; 8] = ['h' as u8, 'a' as u8, 'i' as u8, 'r' as u8,
-                        'b' as u8, 'a' as u8, 'l' as u8, 'l' as u8];
-const CONTAINER_HEADER_SIZE: u64 = 8 + 4 + 4;
+const MAGIC: &'static [u8] = b"hairball";
+const CONTAINER_HEADER_SIZE: u64 = 8 + 3 * 4 + 4 + 4 + 4 + 8 + 16;
+const DEFAULT_OFFSET: u64 = 4096;
+const ALLOC_SIZE: u32 = 4096;
 
 pub struct Container {
     file: std::fs::File,
     segments: Vec<Segment>,
+    uuid: uuid::Uuid
 }
 
 #[derive(Debug)]
@@ -50,14 +54,20 @@ impl std::convert::From<byteorder::Error> for Error {
     }
 }
 
-impl Container {
-    /// Internal function to read header of a file returns
-    /// the size and flags if the header could be read ans
-    /// is valid
-    fn read_header<R>(f: &mut R) -> Result<(u32, u32), Error>
+struct Header {
+    version: [u32; 3],
+    flags: u32,
+    offset: u32,
+    num_segments: u32,
+    segments_offset: u64,
+    uuid: [u8; 16]
+}
+
+impl Header {
+    /// Read the header form a file doing some basic validation
+    fn read<R>(f: &mut R) -> Result<Header, Error>
         where R: std::io::Read
     {
-        // Read the magic value to validate the file
         let mut magic = [0; 8];
         if try!(f.read(&mut magic[..])) != 8 {
             return Err(Error::InvalidHeader);
@@ -65,55 +75,131 @@ impl Container {
             return Err(Error::InvalidHeader);
         }
 
-        let flags = try!(f.read_u32::<LittleEndian>());
-        let segments = try!(f.read_u32::<LittleEndian>());
+        let version = [
+            try!(f.read_u32::<LittleEndian>()),
+            try!(f.read_u32::<LittleEndian>()),
+            try!(f.read_u32::<LittleEndian>()),
+        ];
 
-        Ok((flags, segments))
+        let flags = try!(f.read_u32::<LittleEndian>());
+        let offset = try!(f.read_u32::<LittleEndian>());
+        let num_segments = try!(f.read_u32::<LittleEndian>());
+        let segments_offset = try!(f.read_u64::<LittleEndian>());
+        let mut uuid = [0; 16];
+        try!(f.read(&mut uuid));
+
+        Ok(Header{
+            offset: offset,
+            version: version,
+            flags: flags,
+            num_segments: num_segments,
+            segments_offset: segments_offset,
+            uuid: uuid
+        })
+
     }
 
+    /// Write the header to the file
+    fn write<W>(&self, f: &mut W) -> Result<(), Error>
+        where W: std::io::Write
+    {
+        try!(f.write(MAGIC));
+        for v in &self.version[..] {
+            try!(f.write_u32::<LittleEndian>(*v));
+        }
+        try!(f.write_u32::<LittleEndian>(self.flags));
+        try!(f.write_u32::<LittleEndian>(self.offset));
+        try!(f.write_u32::<LittleEndian>(self.num_segments));
+        try!(f.write_u64::<LittleEndian>(self.segments_offset));
+        try!(f.write(&self.uuid[..]));
+        Ok(())
+    }
+}
+
+impl Container {
     /// Internal function to read header of a file returns
     /// the size and flags if the header could be read ans
     /// is valid
     fn write_header(&mut self) -> Result<(), Error> {
         use std::io::{Write, Seek, SeekFrom};
 
-        try!(self.file.seek(SeekFrom::Start(0)));
-        try!(self.file.write(&MAGIC[..]));
-        // flags
-        try!(self.file.write_u32::<LittleEndian>(0));
-        try!(self.file.write_u32::<LittleEndian>(self.segments.len() as u32));
+        // We can place the segment table at the start of the file
+        // otherwise it gets placed after the last segment
+        let offset = if (DEFAULT_OFFSET - CONTAINER_HEADER_SIZE) / 4 > self.segments.len() as u64 {
+            CONTAINER_HEADER_SIZE
+        } else {
+            self.segments[self.segments.len()-1].next_offset()
+        };
 
-        Ok(())
+        // Write out the segment table
+        try!(self.file.seek(SeekFrom::Start(offset)));
+        for s in &self.segments {
+            try!(self.file.write_u32::<LittleEndian>(s.size as u32))
+        }
+
+        // turn the uuid in a byte array
+        let mut uuid = [0; 16];
+        for (i, b) in self.uuid.as_bytes().iter().enumerate() {
+            uuid[i] = *b;
+        }
+
+        let first = if self.segments.len() == 0 {
+            0
+        } else {
+            self.segments[0].offset as u32
+        };
+
+        try!(self.file.seek(SeekFrom::Start(0)));
+        Header{
+            offset: first,
+            version: [0, 1, 0],
+            flags: 0,
+            num_segments: self.segments.len() as u32,
+            segments_offset: offset,
+            uuid: uuid
+        }.write(&mut self.file)
     }
 
     /// convert a File handle into a Container
     pub fn read<P>(p: P) -> Result<Container, Error>
         where P: AsRef<std::path::Path>
     {
+        use std::io::{Seek, SeekFrom};
+
         let mut f = try!(std::fs::File::open(p));
 
-        let (_, nsegments) = try!(Container::read_header(&mut f));
+        let header = try!(Header::read(&mut f));
 
-        // Get the current offset
-        let mut offset = CONTAINER_HEADER_SIZE;
-        let mut segments = Vec::with_capacity(nsegments as usize);
-        for _ in 0..nsegments {
-            let segment = try!(Segment::read(&mut f, offset));
-            offset = segment.next_offset();
-            segments.push(segment);
+        // Seek the segment table then read it
+        try!(f.seek(SeekFrom::Start(header.segments_offset)));
+        let mut segment_table = Vec::with_capacity(header.num_segments as usize);
+        for _ in 0..header.num_segments {
+            segment_table.push(
+                try!(f.read_u32::<LittleEndian>())
+            );
         }
 
+        // Get the current offset
+        let mut offset = header.offset as u64;
+        let mut segments = Vec::with_capacity(segment_table.len());
+        for size in segment_table {
+            let s = try!(Segment::read(&mut f, offset, size));
+            offset = s.next_offset();
+            segments.push(s);
+        }
+
+
         Ok(Container {
+            uuid: uuid::Uuid::from_bytes(&header.uuid[..]).unwrap(),
             file: f,
             segments: segments,
         })
     }
 
     /// convert a File handle into a Container
-    fn create<P>(p: P) -> Result<Container, Error>
+    fn create<P>(p: P, uuid: uuid::Uuid) -> Result<Container, Error>
         where P: AsRef<std::path::Path>
     {
-
         let file = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -122,6 +208,7 @@ impl Container {
             .open(p);
 
         let mut c = Container {
+            uuid: uuid,
             file: try!(file),
             segments: Vec::new(),
         };
@@ -129,6 +216,9 @@ impl Container {
         try!(c.write_header());
         Ok(c)
     }
+
+    /// get the uuid of the container
+    pub fn uuid(&self) -> uuid::Uuid { self.uuid }
 }
 
 impl capnp::message::ReaderSegments for Container {
@@ -139,65 +229,22 @@ impl capnp::message::ReaderSegments for Container {
     }
 }
 
-#[derive(Debug)]
-struct SegmentHeader {
-    allocated: u32,
-    reserved: u32
-}
-
-impl SegmentHeader {
-    /// read a segment header from a file using the current offset
-    fn read(f: &mut std::fs::File) -> Result<SegmentHeader, Error> {
-        let allocated = try!(f.read_u32::<LittleEndian>());
-        let reserved = try!(f.read_u32::<LittleEndian>());
-
-        Ok(SegmentHeader{
-            allocated: allocated,
-            reserved: reserved
-        })
-    }
-
-    /// Write a header into a file with the current offset
-    fn write(&self, f: &mut std::fs::File) -> Result<(), std::io::Error> {
-        try!(f.write_u32::<LittleEndian>(self.allocated));
-        try!(f.write_u32::<LittleEndian>(self.reserved));
-        Ok(())
-    }
-}
-
 struct Segment {
-    header: SegmentHeader,
     offset: u64,
-    add: usize,
     size: usize,
-    map: Mmap
-}
-
-fn fix_offset(offset: u64) -> (u64, u64) {
-    let page = 4096 as u64;
-    let add = (page - 1) & offset;
-    (offset - add, add)
+    map: Mmap 
 }
 
 impl Segment {
     /// Read a segment from a file at a give offset
-    fn read(f: &mut std::fs::File, offset: u64) -> Result<Segment, Error> {
+    fn read(f: &mut std::fs::File, offset: u64, size: u32) -> Result<Segment, Error> {
         use std::io::{Seek, SeekFrom};
 
-        try!(f.seek(SeekFrom::Start(offset)));
-
-        let header = try!(SegmentHeader::read(f));
-
-        let (offset, add) = fix_offset(offset+8);
-
         // Memory map the file in RO mode
-        let map = try!(Mmap::open_with_offset(f, Protection::Read, offset as usize, header.allocated as usize));
+        let map = try!(Mmap::open_with_offset(f, Protection::Read, offset as usize, size as usize));
 
-        let size = header.allocated;
         Ok(Segment {
-            header: header,
             offset: offset,
-            add: add as usize,
             size: size as usize,
             map: map
         })
@@ -207,28 +254,20 @@ impl Segment {
     fn create(f: &mut std::fs::File, offset: u64, size: u32) -> Result<Segment, Error> {
         use std::io::{Write, Seek, SeekFrom};
 
-        try!(f.seek(SeekFrom::Start(offset)));
-        let header = SegmentHeader {
-            allocated: size,
-            reserved: 0
-        };
-        try!(header.write(f));
-
         if size != 0 {
-            try!(f.seek(SeekFrom::Current(size as i64 - 1)));
+            try!(f.seek(SeekFrom::Start(offset + size as u64 - 1)));
             // write an empty byte to create the segment on disk
             try!(f.write(&[0u8]));
         }
 
-        let (offset, add) = fix_offset(offset+8);
+        println!("{:?} {:?}", offset, size);
+
         
         // Memory map the file in RO mode
         let map = try!(Mmap::open_with_offset(f, Protection::ReadWrite, offset as usize, size as usize));
 
         Ok(Segment {
-            header: header,
             offset: offset,
-            add: add as usize,
             size: size as usize,
             map: map
         })
@@ -236,7 +275,7 @@ impl Segment {
 
     /// Used to calculate where the next segment will land
     fn next_offset(&self) -> u64 {
-        (self.offset + self.header.allocated as u64 + self.add as u64)
+        (self.offset + self.size as u64)
     }
 
 
@@ -251,17 +290,17 @@ impl Segment {
     }
 
     fn as_ptr(&self) -> *mut capnp::Word {
-        (self.map.ptr() as usize + self.add) as *mut capnp::Word
+        self.map.ptr() as *mut capnp::Word
     }
 }
 
 pub struct Builder(Container);
 
 impl Builder {
-    pub fn new<P>(p: P) -> Result<Builder, Error>
+    pub fn new<P>(p: P, uuid: uuid::Uuid) -> Result<Builder, Error>
         where P: AsRef<std::path::Path>
     {
-        let c = try!(Container::create(p));
+        let c = try!(Container::create(p, uuid));
         Ok(Builder(c))
     }
 }
@@ -280,27 +319,27 @@ impl Drop for Builder {
     }
 }
 
-fn align(addr: u32) -> u32 {
-    let page = 4096 as u32;
-    let to_align = page - ((page - 1) & addr);
-    if to_align == 0 {
-        addr
-    } else {
-        addr + to_align
-    }
-}
-
 unsafe impl capnp::message::Allocator for Builder {
     fn allocate_segment(&mut self, size: u32) -> (*mut capnp::Word, u32) {
         let offset = if self.0.segments.len() == 0 {
-            CONTAINER_HEADER_SIZE
+            DEFAULT_OFFSET
         } else {
             let len = self.0.segments.len();
             self.0.segments[len-1].next_offset()
         };
 
-        let end = align(offset as u32 + size * 8 + 8);
-        let size  = end - offset as u32 - 8;
+        let size = size * 8;
+
+        // size must be at least ALLOC_SIZE and must also
+        // be a multiple of alloc size
+        let size = if size < ALLOC_SIZE {
+            ALLOC_SIZE
+        } else if (ALLOC_SIZE - 1) & size == size {
+            size
+        } else {
+            size + ((ALLOC_SIZE - 1) & size)
+        };
+
         let segment = Segment::create(&mut self.0.file, offset, size).unwrap();
         let ptr = segment.as_ptr();
         self.0.segments.push(segment);

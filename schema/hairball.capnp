@@ -39,5 +39,4 @@ struct Hairball {
     entities @1 :List(Entity);
     columns @2 :Column;
     external @3 :List(Data);
-    uuid @4 :Data;
 }
