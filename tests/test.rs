@@ -2,7 +2,7 @@ extern crate uuid;
 extern crate hairball;
 extern crate capnp;
 
-use hairball::{Reader, Builder, LocalEntity, ExternalEntity};
+use hairball::{Reader, Builder, LocalEntity, ExternalEntity, file_uuid};
 
 
 #[test]
@@ -111,6 +111,8 @@ fn read_uuid() {
 
     let hairball = Reader::read("hairballs/uuid.hairball").unwrap();
     assert_eq!(uuid, hairball.uuid());
+
+    assert_eq!(uuid, file_uuid("hairballs/uuid.hairball").unwrap());
 }
 
 #[test]
@@ -130,7 +132,7 @@ fn columns() {
     }
     hairball.close();
 
-    let mut hairball = Reader::read("hairballs/column.hairball").unwrap();
+    let hairball = Reader::read("hairballs/column.hairball").unwrap();
     for i in 0..1_000 {
         println!("Looking for {}", i);
         let builder = hairball.column(&format!("column_{}", i)).unwrap();

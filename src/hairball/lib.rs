@@ -5,7 +5,7 @@ extern crate byteorder;
 extern crate semver;
 
 use std::collections::HashMap;
-pub use container::Error;
+pub use container::{Error, file_uuid};
 
 mod container;
 
@@ -18,6 +18,7 @@ pub mod hairball_capnp {
 pub mod hairball_capnp;
 
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 
 /// A `Builder` is used to construct a hairball
 pub struct Builder {
@@ -364,7 +365,7 @@ impl Reader {
 
     /// fetch a column with the name, returns None if not column was found
     /// that matches the name
-    pub fn column(&mut self, name: &str) -> Option<capnp::any_pointer::Reader> {
+    pub fn column(&self, name: &str) -> Option<capnp::any_pointer::Reader> {
         let root = self.reader.get_root::<hairball_capnp::hairball::Reader>().unwrap();
         let mut column = match root.get_columns() {
             Ok(c) => c,

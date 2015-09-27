@@ -345,3 +345,13 @@ unsafe impl capnp::message::Allocator for Builder {
         (ptr, size / 8)
     }
 }
+
+
+pub fn file_uuid<P>(p: P) -> Result<uuid::Uuid, Error>
+    where P: AsRef<std::path::Path>
+{
+    let mut f = try!(std::fs::File::open(p));
+    Header::read(&mut f)
+        .map(|header| uuid::Uuid::from_bytes(&header.uuid[..]).unwrap())
+}
+
