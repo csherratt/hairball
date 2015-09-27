@@ -1,16 +1,15 @@
 [package]
-name = "hairball"
-version = "0.1.1"
+name = "hairball_meta"
+version = "0.1.0"
 authors = ["Colin Sherratt <colin.sherratt@gmail.com>"]
-build = "build.rs"
 
-[dependencies]
-capnp = "0.4"
+[dependencies.hairball]
+path = "src/hairball"
+
+[dev_dependencies]
 uuid = "0.1"
-byteorder = "0.3"
-libc = "0.1"
-memmap = "0.2"
-semver = "0.1"
+capnp = "0.4"
 
-[build_dependencies]
-capnpc = "0.4"
+[features]
+default = []
+build-schema = ["hairball/build-schema"]
