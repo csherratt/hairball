@@ -1,5 +1,6 @@
 extern crate capnp;
 extern crate hairball;
+extern crate gfx;
 extern crate gfx_mesh;
 
 use gfx_mesh::{Attribute, Interlaced};
@@ -11,37 +12,17 @@ pub mod mesh_capnp {
 
 const COLUMN_NAME: &'static str = "mesh";
 
-pub struct Reader<'a, E:'a> {
-    reader: &'a hairball::ReaderMapping<'a, E>,
-    column: mesh_capnp::column::Reader<'a>,
-    index: u32
-}
-
-pub fn read<'a, E>(read: &'a hairball::ReaderMapping<'a, E>) -> Option<Reader<'a, E>>
-    where E: 'a
-{
-    read.column(COLUMN_NAME)
-        .and_then(|c| c.get_as().ok() )
-        .map(|c| Reader{
-            reader: read,
-            column: c,
-            index: 0
-        })
-}
-
 pub enum Error {
     Capnp(capnp::Error),
     NotInSchema,
     Mesh(gfx_mesh::Error)
 }
 
-
 impl std::convert::From<capnp::Error> for Error {
     fn from(err: capnp::Error) -> Error {
         Error::Capnp(err)
     }
 }
-
 
 impl std::convert::From<capnp::NotInSchema> for Error {
     fn from(_: capnp::NotInSchema) -> Error {
@@ -125,5 +106,88 @@ impl<'a, E> Iterator for Reader<'a, E> {
             }            
         }
         None
+    }
+}
+
+pub struct Reader<'a, E:'a> {
+    reader: &'a hairball::ReaderMapping<'a, E>,
+    column: mesh_capnp::column::Reader<'a>,
+    index: u32
+}
+
+pub fn read<'a, E>(read: &'a hairball::ReaderMapping<'a, E>) -> Option<Reader<'a, E>>
+    where E: 'a
+{
+    read.column(COLUMN_NAME)
+        .and_then(|c| c.get_as().ok() )
+        .map(|c| Reader{
+            reader: read,
+            column: c,
+            index: 0
+        })
+}
+
+fn write_attribute<S>(mut builder: mesh_capnp::attribute::Builder, mesh: &Attribute<S>)
+    where S: AsRef<str>
+{
+    use gfx::device::attrib::{Type, FloatSize, FloatSubType, IntSize, IntSubType, SignFlag};
+    use mesh_capnp::Type::*;
+
+    builder.set_name(mesh.name.as_ref());
+    builder.set_element_count(mesh.element_count);
+    let t = match mesh.element_type {
+        Type::Float(FloatSubType::Default, FloatSize::F32) => F32,
+        Type::Float(FloatSubType::Default, FloatSize::F64) => F64,
+        Type::Int(IntSubType::Raw, IntSize::U8, SignFlag::Signed) => I8,
+        Type::Int(IntSubType::Raw, IntSize::U16, SignFlag::Signed) => I16,
+        Type::Int(IntSubType::Raw, IntSize::U32, SignFlag::Signed) => I32,
+        Type::Int(IntSubType::Raw, IntSize::U8, SignFlag::Unsigned) => U8,
+        Type::Int(IntSubType::Raw, IntSize::U16, SignFlag::Unsigned) => U16,
+        Type::Int(IntSubType::Raw, IntSize::U32, SignFlag::Unsigned) => U32,
+        Type::Int(IntSubType::Normalized, IntSize::U8, SignFlag::Signed) => NormalizedI8,
+        Type::Int(IntSubType::Normalized, IntSize::U16, SignFlag::Signed) => NormalizedI16,
+        Type::Int(IntSubType::Normalized, IntSize::U32, SignFlag::Signed) => NormalizedI32,
+        Type::Int(IntSubType::Normalized, IntSize::U8, SignFlag::Unsigned) => NormalizedU8,
+        Type::Int(IntSubType::Normalized, IntSize::U16, SignFlag::Unsigned) => NormalizedU16,
+        Type::Int(IntSubType::Normalized, IntSize::U32, SignFlag::Unsigned) => NormalizedU32,
+        _ => panic!("unsupported type {:?}", mesh.element_type)
+    };
+    builder.set_element_type(t);
+}
+
+fn write_buffers<R, A, S, D>(mut builder: mesh_capnp::mesh::Builder, name: u32, mesh: &R)
+    where R: AsRef<[Interlaced<A, S, D>]>,
+          A: AsRef<[Attribute<S>]>,
+          S: AsRef<str>,
+          D: AsRef<[u8]>
+{
+    builder.set_id(name);
+    let mut buffers = builder.init_buffers(mesh.as_ref().len() as u32);
+    for (i, buff) in mesh.as_ref().iter().enumerate() {
+        let mut m = buffers.borrow().get(i as u32);
+        m.set_data(buff.data().as_ref());
+        let mut attrs = m.init_attributes(buff.attributes().as_ref().len() as u32);
+        for (j, att) in buff.attributes().as_ref().iter().enumerate() {
+            let a = attrs.borrow().get(j as u32);
+            write_attribute(a, att);
+        }
+    }
+}
+
+///
+pub fn write<'a, R, A, S, D>(hb: &mut hairball::Builder, i: &[(u32, &'a R)])
+    where R: AsRef<[Interlaced<A, S, D>]>,
+          A: AsRef<[Attribute<S>]>,
+          S: AsRef<str>,
+          D: AsRef<[u8]>
+{
+    let column: mesh_capnp::column::Builder = hb.column(COLUMN_NAME)
+        .and_then(|c| c.get_as())
+        .unwrap();
+
+    let mut rows = column.init_meshes(i.len() as u32);
+    for (i, &(name, ref mesh)) in i.iter().enumerate() {
+        let row = rows.borrow().get(i as u32);
+        write_buffers(row, name, mesh);
     }
 }

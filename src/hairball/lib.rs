@@ -144,6 +144,49 @@ impl Builder {
             column.init_data()
         })
     }
+
+    pub fn mapping<E>(&mut self) -> BuilderMapping<E>
+        where E: Eq+std::hash::Hash
+    {
+        BuilderMapping {
+            writer: self,
+            entities: HashMap::new()
+        }
+    }
+}
+
+pub struct BuilderMapping<'a, E> {
+    writer: &'a mut Builder,
+    entities: HashMap<E, u32>
+}
+
+impl<'a, E> BuilderMapping<'a, E> {
+    pub fn entity(&self, e: &E) -> Option<u32>
+        where E: Eq + std::hash::Hash
+    {
+        self.entities.get(e).map(|x| *x)
+    }
+
+    pub fn add_entity(&mut self, e: E, local: LocalEntity<String>) -> u32
+        where E: Eq + std::hash::Hash
+    {
+        if let Some(&idx) = self.entities.get(&e) {
+            idx
+        } else {
+            let idx = self.writer.add_entity(local) as u32;
+            self.entities.insert(e, idx);
+            idx
+        }
+    }
+}
+
+impl<'a, E> std::ops::Deref for BuilderMapping<'a, E> {
+    type Target = Builder;
+    fn deref(&self) -> &Builder { self.writer }
+}
+
+impl<'a, E> std::ops::DerefMut for BuilderMapping<'a, E> {
+    fn deref_mut(&mut self) -> &mut Builder { self.writer }
 }
 
 #[derive(Debug)]
@@ -396,7 +439,7 @@ impl Reader {
         }
     }
 
-    //
+    /// Create a 
     pub fn into_mapping<E, F>(&self, mut f: F) -> ReaderMapping<E>
         where F: FnMut(usize) -> E
     {

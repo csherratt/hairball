@@ -10,6 +10,7 @@ path = "lib.rs"
 
 [dependencies]
 capnp = "0.4"
+gfx="0.7"
 
 [dependencies.hairball]
 path = "../hairball"
