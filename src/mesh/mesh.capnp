@@ -1,7 +1,7 @@
 @0xe5428d3d69b8dfa0;
 
 using Cxx = import "/capnp/c++.capnp";
-$Cxx.namespace("hairball");
+$Cxx.namespace("mesh");
 
 enum Type {
     f32 @0;

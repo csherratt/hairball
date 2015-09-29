@@ -2,7 +2,7 @@ extern crate capnpc;
 
 #[cfg(feature="build-schema")]
 fn main() {
-    ::capnpc::compile("mesh", &["mesh.capnp"]).unwrap();
+    ::capnpc::compile("index", &["index.capnp"]).unwrap();
 }
 
 #[cfg(not(feature="build-schema"))]
