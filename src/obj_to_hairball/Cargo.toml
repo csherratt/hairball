@@ -1,0 +1,24 @@
+[package]
+name = "obj_to_hairball"
+version = "0.1.1"
+authors = ["Colin Sherratt <colin.sherratt@gmail.com>"]
+
+[[bin]]
+name = "obj_to_hairball"
+path = "bin.rs"
+
+[dependencies.hairball]
+path = "../hairball"
+
+[dependencies.hairball_mesh]
+path = "../mesh"
+
+[dependencies.hairball_mesh_index]
+path = "../mesh_index"
+
+[dependencies]
+obj="*"
+genmesh="*"
+
+[dependencies.gfx_mesh]
+git = "https://github.com/csherratt/gfx_mesh.git"

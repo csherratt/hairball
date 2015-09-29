@@ -12,8 +12,8 @@ path = "src/mesh"
 [dependencies.hairball_mesh_index]
 path = "src/mesh_index"
 
-#[dependencies.obj_to_hairball]
-#path = "src/obj_to_hairball"
+[dependencies.obj_to_hairball]
+path = "src/obj_to_hairball"
 
 [dev_dependencies]
 uuid = "0.1"
