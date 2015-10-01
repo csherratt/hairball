@@ -12,6 +12,10 @@ path = "src/mesh"
 [dependencies.hairball_mesh_index]
 path = "src/mesh_index"
 
+[dependencies.hairball_material]
+path = "src/mesh_index"
+
+
 [dependencies.obj_to_hairball]
 path = "src/obj_to_hairball"
 

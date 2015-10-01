@@ -90,32 +90,5 @@ fn main() {
         (*name_to_id.get(&name[..]).unwrap(), mesh)
     }).collect();
     hairball_mesh::write(&mut builder, &x[..]);
-
-    /*let mut vertices = Vec::new();
-    let indices: Vec<u32> = {
-        let object = object.clone();
-        let mut indexer = LruIndexer::new(64, |_, v| {
-            let (p, t, n): (usize, Option<usize>, Option<usize>) = v;
-            let p = object.position()[p];
-            let t = t.map(|t| object.texture()[t]).unwrap_or([0., 0.]);
-            let n = n.map(|n| object.normal()[n]).unwrap_or([1., 0., 0.]);
-            vertices.push((p, n, t))
-        });
-
-        idx.iter()
-           .map(|x| *x)
-           .triangulate()
-           .vertex(|v| indexer.index(v) as u32)
-           .vertices()
-           .collect()
-    };
-
-    let vertices = [Attribute::f32(POSITION, 3), Attribute::f32(NORMAL, 3), Attribute::f32(TEX0, 2)]
-        .build(vertices.into_iter())
-        .unwrap()
-        .owned_attributes();
-
-    File::open(path.clone()).map(|f| {*/
-
-
+    builder.close();
 }

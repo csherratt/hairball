@@ -1,0 +1,22 @@
+[package]
+name = "hairball_material"
+version = "0.1.0"
+authors = ["Colin Sherratt <colin.sherratt@gmail.com>"]
+build = "build.rs"
+
+[lib]
+name = "hairball_material"
+path = "lib.rs"
+
+[dependencies]
+capnp = "0.5"
+
+[dependencies.hairball]
+path = "../hairball"
+
+[build_dependencies]
+capnpc = "0.5"
+
+[features]
+default = ["build-schema"]
+build-schema = []
