@@ -21,9 +21,7 @@ pub enum Component {
     Specular
 }
 
-pub fn write<'a, R>(hb: &mut hairball::Builder, i: &[(u32, Component, Value)])
-    where R: AsRef<[u32]>
-{
+pub fn write(hb: &mut hairball::Builder, i: &[(u32, Component, Value)]) {
     use material_capnp::Component::*;
 
     let column: material_capnp::column::Builder = hb.column(COLUMN_NAME)

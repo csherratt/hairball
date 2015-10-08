@@ -16,6 +16,9 @@ path = "../mesh"
 [dependencies.hairball_mesh_index]
 path = "../mesh_index"
 
+[dependencies.hairball_material]
+path = "../material"
+
 [dependencies]
 obj="*"
 genmesh="*"
