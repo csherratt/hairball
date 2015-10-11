@@ -6,6 +6,7 @@ extern crate hairball_mesh;
 extern crate hairball_mesh_index;
 extern crate hairball_material;
 extern crate hairball_geometry;
+extern crate hairball_draw_binding;
 
 use std::fs::File;
 use std::io::BufReader;
@@ -81,7 +82,6 @@ fn main() {
 
     let materials = builder.add_entity(LocalEntity::named("material".to_owned()));
     let geometry = builder.add_entity(LocalEntity::named("geometry".to_owned()));
-    //let objects = builder.add_entity(LocalEntity::named("object".to_owned()));
 
     let mut material_names = HashMap::new();
     let mut material_binding = Vec::new();
@@ -126,7 +126,7 @@ fn main() {
                 .build(vertices.into_iter())
                 .unwrap()
                 .owned_attributes();
-            mesh.insert(name, (indices, vec![vertices]));
+            mesh.insert(name, (indices, vec![vertices], g));
         }
     }
 
@@ -135,25 +135,26 @@ fn main() {
         name_to_id.insert(
             &name[..],
             builder.add_entity(
-                LocalEntity::named(name.clone()).parent(geometry)
+                LocalEntity::named(name.clone())
+                    .parent(geometry)
             )
         );
     }
 
     let x: Vec<(u32, &Vec<u32>)> =
-        mesh.iter().map(|(name, &(ref indices, _))| {
+        mesh.iter().map(|(name, &(ref indices, _, _))| {
             (*name_to_id.get(&name[..]).unwrap(), indices)
         }).collect();
     hairball_mesh_index::write(&mut builder, &x[..]);
 
     let x: Vec<(u32, &Vec<Interlaced<Vec<Attribute<String>>, String, Vec<u8>>>)> =
-        mesh.iter().map(|(name, &(_, ref mesh))| {
+        mesh.iter().map(|(name, &(_, ref mesh, _))| {
             (*name_to_id.get(&name[..]).unwrap(), mesh)
         }).collect();
     hairball_mesh::write(&mut builder, &x[..]);
 
     let x: Vec<(u32, hairball_geometry::Geometry<u32>)> =
-        mesh.iter().map(|(name, &(ref idx, _))| {
+        mesh.iter().map(|(name, &(ref idx, _, _))| {
             let name = *name_to_id.get(&name[..]).unwrap();
             (
                 name,
@@ -165,6 +166,22 @@ fn main() {
             )
         }).collect();
     hairball_geometry::write(&mut builder, &x[..]);
+
+    let x: Vec<(u32, hairball_draw_binding::DrawBinding<u32>)> =
+        mesh.iter()
+            .filter(|&(_, &(_, _, ref o))| o.material.is_some())
+            .map(|(name, &(_, _, ref o))| {
+                let name = *name_to_id.get(&name[..]).unwrap();
+                let material = *material_names.get(o.material.as_ref().unwrap()).unwrap();
+                (
+                    name,
+                    hairball_draw_binding::DrawBinding{
+                        geometry: name,
+                        material: material
+                    }
+                )
+        }).collect();
+    hairball_draw_binding::write(&mut builder, &x[..]);
 
     builder.close();
 }

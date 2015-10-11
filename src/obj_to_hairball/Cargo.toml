@@ -22,6 +22,9 @@ path = "../material"
 [dependencies.hairball_geometry]
 path = "../geometry"
 
+[dependencies.hairball_draw_binding]
+path = "../draw_binding"
+
 [dependencies]
 obj="*"
 genmesh="*"
