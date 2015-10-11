@@ -5,6 +5,7 @@ extern crate hairball;
 extern crate hairball_mesh;
 extern crate hairball_mesh_index;
 extern crate hairball_material;
+extern crate hairball_geometry;
 
 use std::fs::File;
 use std::io::BufReader;
@@ -95,7 +96,6 @@ fn main() {
             &mut material_binding
         ).unwrap();
     }
-
     hairball_material::write(&mut builder, &material_binding[..]);
 
     let mut mesh = HashMap::new();
@@ -126,7 +126,6 @@ fn main() {
                 .build(vertices.into_iter())
                 .unwrap()
                 .owned_attributes();
-
             mesh.insert(name, (indices, vec![vertices]));
         }
     }
@@ -141,15 +140,31 @@ fn main() {
         );
     }
 
-    let x: Vec<(u32, &Vec<u32>)> = mesh.iter().map(|(name, &(ref indices, _))|{
-        (*name_to_id.get(&name[..]).unwrap(), indices)
-    }).collect();
+    let x: Vec<(u32, &Vec<u32>)> =
+        mesh.iter().map(|(name, &(ref indices, _))| {
+            (*name_to_id.get(&name[..]).unwrap(), indices)
+        }).collect();
     hairball_mesh_index::write(&mut builder, &x[..]);
 
-
-    let x: Vec<(u32, &Vec<Interlaced<Vec<Attribute<String>>, String, Vec<u8>>>)> = mesh.iter().map(|(name, &(_, ref mesh))|{
-        (*name_to_id.get(&name[..]).unwrap(), mesh)
-    }).collect();
+    let x: Vec<(u32, &Vec<Interlaced<Vec<Attribute<String>>, String, Vec<u8>>>)> =
+        mesh.iter().map(|(name, &(_, ref mesh))| {
+            (*name_to_id.get(&name[..]).unwrap(), mesh)
+        }).collect();
     hairball_mesh::write(&mut builder, &x[..]);
+
+    let x: Vec<(u32, hairball_geometry::Geometry<u32>)> =
+        mesh.iter().map(|(name, &(ref idx, _))| {
+            let name = *name_to_id.get(&name[..]).unwrap();
+            (
+                name,
+                hairball_geometry::Geometry{
+                    mesh: name,
+                    start: 0,
+                    length: idx.len() as u32
+                }
+            )
+        }).collect();
+    hairball_geometry::write(&mut builder, &x[..]);
+
     builder.close();
 }

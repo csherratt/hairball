@@ -43,6 +43,7 @@ impl<'a, E> Iterator for Reader<'a, E> {
                 Some(id) => id,
                 None => continue
             };
+
             let mesh = match self.reader.entity(row.get_mesh() as usize) {
                 Some(mesh) => mesh,
                 None => continue
