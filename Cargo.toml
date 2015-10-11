@@ -18,6 +18,9 @@ path = "src/material"
 [dependencies.hairball_geometry]
 path = "src/geometry"
 
+[dependencies.hairball_draw_binding]
+path = "src/draw_binding"
+
 [dependencies.obj_to_hairball]
 path = "src/obj_to_hairball"
 
