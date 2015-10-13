@@ -189,10 +189,10 @@ impl<'a, E> std::ops::DerefMut for BuilderMapping<'a, E> {
     fn deref_mut(&mut self) -> &mut Builder { self.writer }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct LocalEntity<T> {
-    name: Option<T>,
-    parent: Option<u32>
+    pub name: Option<T>,
+    pub parent: Option<u32>
 }
 
 impl<T> LocalEntity<T> {
