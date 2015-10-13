@@ -367,7 +367,7 @@ impl Reader {
     }
 
     /// Get the entity
-    pub fn entity(&self, idx: usize) -> Option<Entity<&str>> {
+    pub fn get_entity(&self, idx: usize) -> Option<Entity<&str>> {
         self.reader.get_root::<hairball_capnp::hairball::Reader>()
             .and_then(|root| Ok(root.get_entities().unwrap())).ok()
             .and_then(|entities| {
