@@ -175,5 +175,5 @@ fn main() {
         }
     }
     hairball_geometry::write(&mut builder, &x[..]);
-
+    builder.close();
 }

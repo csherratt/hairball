@@ -336,7 +336,7 @@ unsafe impl capnp::message::Allocator for Builder {
         } else if (ALLOC_SIZE - 1) & size == size {
             size
         } else {
-            size + ((ALLOC_SIZE - 1) & size)
+            size + (ALLOC_SIZE - ((ALLOC_SIZE - 1) & size))
         };
 
         let segment = Segment::create(&mut self.0.file, offset, size).unwrap();
