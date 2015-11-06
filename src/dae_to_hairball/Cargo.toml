@@ -1,0 +1,33 @@
+[package]
+name = "dae_to_hairball"
+version = "0.1.0"
+authors = ["Colin Sherratt <colin.sherratt@gmail.com>"]
+
+[[bin]]
+name = "dae_to_hairball"
+path = "bin.rs"
+
+[dependencies.hairball]
+path = "../hairball"
+
+[dependencies.hairball_mesh]
+path = "../mesh"
+
+[dependencies.hairball_mesh_index]
+path = "../mesh_index"
+
+[dependencies.hairball_material]
+path = "../material"
+
+[dependencies.hairball_geometry]
+path = "../geometry"
+
+[dependencies.hairball_draw_binding]
+path = "../draw_binding"
+
+[dependencies]
+collada="*"
+genmesh="*"
+
+[dependencies.gfx_mesh]
+git = "https://github.com/csherratt/gfx_mesh.git"
