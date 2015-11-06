@@ -426,6 +426,11 @@ impl Reader {
                 }
             }
 
+            if column.has_name() {
+                return None;
+            }
+
+
             column = match column.get_next() {
                 Ok(x) => x,
                 Err(_) => return None

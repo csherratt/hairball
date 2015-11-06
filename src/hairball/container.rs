@@ -306,9 +306,7 @@ impl Builder {
 
 impl capnp::message::ReaderSegments for Builder {
     fn get_segment<'a>(&'a self, id: u32) -> Option<&'a [capnp::Word]> {
-        let out = self.0.segments.get(id as usize)
-            .map(|seg| seg.words());
-        out
+        self.0.segments.get(id as usize).map(|seg| seg.words())
     }
 }
 
