@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use collada::document::ColladaDocument;
 use gfx_mesh::{BuildInterlaced, Interlaced, Attribute};
 use hairball::LocalEntity;
+use hairball_material::{Component, Value};
 
 use genmesh::{
     Triangulate,
@@ -137,6 +138,14 @@ fn main() {
         }
     }
 
+    let red = builder.add_entity(LocalEntity::named("red".to_owned()));
+    let x = vec![
+        (red, Component::Ambient,  Value::Color([1.0, 0.0, 0.0, 1.0])),
+        (red, Component::Diffuse,  Value::Color([1.0, 0.0, 0.0, 1.0])),
+        (red, Component::Specular, Value::Color([0.0, 0.0, 0.0, 1.0]))
+    ];
+    hairball_material::write(&mut builder, &x[..]);
+
     let meshes = objs.objects
         .iter()
         .enumerate()
@@ -175,5 +184,22 @@ fn main() {
         }
     }
     hairball_geometry::write(&mut builder, &x[..]);
+
+    let mut x: Vec<(u32, hairball_draw_binding::DrawBinding<u32>)> = Vec::new();
+    for &(oi, ref o) in meshes.iter() {
+        for &(gi, _, ref idx) in o {
+            x.push(
+                (
+                    name_to_id[&(oi, Some(gi))],
+                    hairball_draw_binding::DrawBinding{
+                        geometry: name_to_id[&(oi, Some(gi))],
+                        material: red
+                    }
+                )
+            );
+        }
+    }
+    hairball_draw_binding::write(&mut builder, &x[..]);
+
     builder.close();
 }
