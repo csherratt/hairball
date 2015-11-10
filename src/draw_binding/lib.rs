@@ -6,6 +6,9 @@ pub mod draw_binding_capnp {
     include!(concat!(env!("OUT_DIR"), "/draw_binding_capnp.rs"));
 }
 
+#[cfg(not(feature="build-schema"))]
+pub mod draw_binding_capnp;
+
 const COLUMN_NAME: &'static str = "draw_binding";
 
 #[derive(Copy, Debug, Clone)]
