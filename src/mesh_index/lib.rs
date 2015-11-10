@@ -6,6 +6,9 @@ pub mod index_capnp {
     include!(concat!(env!("OUT_DIR"), "/index_capnp.rs"));
 }
 
+#[cfg(not(feature="build-schema"))]
+pub mod index_capnp;
+
 const COLUMN_NAME: &'static str = "mesh_index";
 
 pub fn write<'a, R>(hb: &mut hairball::Builder, i: &[(u32, &'a R)])

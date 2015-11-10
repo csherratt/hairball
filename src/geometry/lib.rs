@@ -6,6 +6,9 @@ pub mod geometry_capnp {
     include!(concat!(env!("OUT_DIR"), "/geometry_capnp.rs"));
 }
 
+#[cfg(not(feature="build-schema"))]
+pub mod geometry_capnp;
+
 const COLUMN_NAME: &'static str = "geometry";
 
 #[derive(Copy, Debug, Clone)]

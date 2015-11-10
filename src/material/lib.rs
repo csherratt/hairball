@@ -6,6 +6,9 @@ pub mod material_capnp {
     include!(concat!(env!("OUT_DIR"), "/material_capnp.rs"));
 }
 
+#[cfg(not(feature="build-schema"))]
+pub mod material_capnp;
+
 const COLUMN_NAME: &'static str = "material";
 
 #[derive(Copy, Clone, Debug)]

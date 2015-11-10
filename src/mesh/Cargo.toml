@@ -22,5 +22,5 @@ git = "https://github.com/csherratt/gfx_mesh.git"
 capnpc = "0.5"
 
 [features]
-default = ["build-schema"]
+default = []
 build-schema = []

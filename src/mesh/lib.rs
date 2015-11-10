@@ -10,6 +10,9 @@ pub mod mesh_capnp {
     include!(concat!(env!("OUT_DIR"), "/mesh_capnp.rs"));
 }
 
+#[cfg(not(feature="build-schema"))]
+pub mod mesh_capnp;
+
 const COLUMN_NAME: &'static str = "mesh";
 
 pub enum Error {
