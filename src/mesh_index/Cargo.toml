@@ -18,5 +18,5 @@ path = "../hairball"
 capnpc = "0.5"
 
 [features]
-default = ["build-schema"]
+default = []
 build-schema = []
